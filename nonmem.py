@@ -27,18 +27,20 @@ dose_info = clean_id(dose_info)
 dm = clean_id(dm)
 
 
-drug_conc['Time'] = pd.to_datetime(drug_conc['Time']
-
-
-
+drug_conc['Time'] = pd.to_datetime(drug_conc['Time'])
+drug_conc['Date'] = drug_conc['Time'].dt.date
+# Should I replace drug concentration time with dosing information start time when drug concentration = 0?
+drug_conc['Time'] = drug_conc['Time'].dt.time
+drug_conc['mdv'] = drug_conc['Drug concentration'].apply(lambda x: 1 if x > 0 else 0)
+drug_conc['amt'] = drug_conc.apply(lambda row: dose_info.loc[1]['Dose'][:-2].strip() if row['Drug concentration'] == 0 else 0,axis=1)
+drug_conc = drug_conc.join(dm.set_index('USUBJID'), on = 'USUBJID')
+drug_conc = drug_conc.join(dose_info[['USUBJID','Study day', 'Drug']].set_index('USUBJID'), on = 'USUBJID')
+drug_conc = drug_conc.loc[:, ['USUBJID', 'Date', 'Time', 'amt', 'Drug concentration', 'mdv', 'Study day', 'Drug', 'Age', 'Sex', 'Albumin', 'body weight']]
+drug_conc.columns = ['ID', 'DATE', 'TIME', 'AMT', 'DV', 'MDV', 'STUDY DAY', 'DRUG/ARM', 'AGE', 'SEX', 'ALBUMIN', 'WEIGHT']
 print(drug_conc)
 
 os.remove('nonmem.csv')
-with open('nonmem.csv', 'w') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(['ID', 'Time', 'AMT', 'DV', 'MDV', 'EVID', 'DOSE', 'DRUG/ARM', 'AGE', 'SEX', 'ALBUMIN', 'WEIGHT'])
-    
-
+drug_conc.to_csv('nonmem.csv', index = False)
 
 
 
