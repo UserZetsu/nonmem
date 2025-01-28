@@ -4,54 +4,83 @@ import numpy as np
 import datetime
 import os 
 
-dm = pd.read_csv('Raw_data_DrugB_3_dm.csv')
-dose_info = pd.read_csv('Raw_data_DrugB_3_dosing_info.csv')
-drug_conc = pd.read_csv('Raw_data_DrugB_3_drug_conc.csv')
+# Load data 
+dm = pd.read_csv('data/Raw_data_DrugB_3_dm.csv')
+dose_info = pd.read_csv('data/Raw_data_DrugB_3_dosing_info.csv')
+drug_conc = pd.read_csv('data/Raw_data_DrugB_3_drug_conc.csv')
+
+# Joining three dataframes together 
+df = drug_conc.join(dm.set_index('USUBJID'), on = 'USUBJID')
+df = drug_conc.join(dose_info[['USUBJID', 'Study day', 'Drug', 'Start Time', 'DATE', 'Dose']].set_index('USUBJID'), on = 'USUBJID')
 
 
-def clean_id(df):
-    df['USUBJID'] = df['USUBJID'].str[1:].astype(int) - 1000
-    return df
+# Cleaning IDs 
+df['USUBJID'] = df['USUBJID'].str[1:].astype(int) - 1000
 
-# Visualizations to produce 
-
-# 1. Plot of drug concentration vs time for each subject
-
-## data requirements 
-# Data is from drug_conc
-# need to clean time to just hours by person 
-
-# Cleaning IDs
-drug_conc = clean_id(drug_conc)
-dose_info = clean_id(dose_info)
-dm = clean_id(dm)
+# Cleaning dates 
+df['Time'] = pd.to_datetime(df['Time'])
+## Setting Start Time
+df['Start Time'] = pd.to_datetime(df['DATE'] + ' ' + df['Start Time'])
 
 
-drug_conc['Time'] = pd.to_datetime(drug_conc['Time'])
-drug_conc['Date'] = drug_conc['Time'].dt.date
-# Should I replace drug concentration time with dosing information start time when drug concentration = 0?
-drug_conc['Time'] = drug_conc['Time'].dt.time
-drug_conc['mdv'] = drug_conc['Drug concentration'].apply(lambda x: 1 if x > 0 else 0)
-drug_conc['amt'] = drug_conc.apply(lambda row: dose_info.loc[1]['Dose'][:-2].strip() if row['Drug concentration'] == 0 else 0,axis=1)
-drug_conc = drug_conc.join(dm.set_index('USUBJID'), on = 'USUBJID')
-drug_conc = drug_conc.join(dose_info[['USUBJID','Study day', 'Drug']].set_index('USUBJID'), on = 'USUBJID')
-drug_conc = drug_conc.loc[:, ['USUBJID', 'Date', 'Time', 'amt', 'Drug concentration', 'mdv', 'Study day', 'Drug', 'Age', 'Sex', 'Albumin', 'body weight']]
-drug_conc.columns = ['ID', 'DATE', 'TIME', 'AMT', 'DV', 'MDV', 'STUDY DAY', 'DRUG/ARM', 'AGE', 'SEX', 'ALBUMIN', 'WEIGHT']
-print(drug_conc)
+# Creating MDV, 0 if there is no value, 1 if there is a value 
+df['mdv'] = df['Drug concentration'].apply(lambda x: 0 if x > 0 else 1)
 
-os.remove('nonmem.csv')
-drug_conc.to_csv('nonmem.csv', index = False)
+# Creating amt, 
+df = df.groupby('USUBJID').apply(lambda x: x.replace(x.iloc[0]['Time'], x.iloc[0]['Start Time']))
+print(df)
 
 
+# # Convert to datetype
+# drug_conc['Time'] = pd.to_datetime(drug_conc['Time'])
+# drug_conc['Elapsed time'] = drug_conc.groupby('USUBJID')['Time'].transform(lambda x: )
 
-## graph requirements: 
-# Color by covariates 
-# Need 1 average line and lines for each person 
+# # Splitting Date from Time and converting to format
+# drug_conc['Date'] = drug_conc['Time'].dt.date
+# drug_conc['Date'] = drug_conc['Date'].apply(lambda x: x.strftime('%m/%d/%Y'))
 
-# 2. Line plot of renal clearance by age 
-# Need average and std dev 
+# # Splitting Time from Time
+# drug_conc['Time'] = drug_conc['Time'].dt.time
 
-# 3. Boxplot of female and male by weight 
+# # Grabbing dose
+# drug_conc['amt'] = drug_conc.apply(lambda x: dose_info.loc[1]['Dose'][:-2].strip() if x['Drug concentration'] == 0 else 0,axis=1)
+
+# # Join datasets
+# drug_conc = drug_conc.join(dm.set_index('USUBJID'), on = 'USUBJID')
+# drug_conc = drug_conc.join(dose_info[['USUBJID','Study day', 'Drug', 'Start Time']].set_index('USUBJID'), on = 'USUBJID')
+
+
+# # Making start time as my first time value
+# drug_conc['Time'] = drug_conc.apply(lambda x: pd.to_datetime(x['Start Time']).time() if x['mdv'] == 1 else x['Time'], axis=1)
+
+
+# # Converting gender to binary 
+# drug_conc['Sex'] = drug_conc['Sex'].apply(lambda x: 1 if x == "Male" else 0)
+
+# # Column reordering 
+# drug_conc = drug_conc.loc[:, ['USUBJID', 'Date', 'Time', 'amt', 'Drug concentration', 'mdv', 'Study day', 'Drug', 'Age', 'Sex', 'Albumin', 'body weight']]
+# drug_conc.columns = ['ID', 'DATE', 'TIME', 'AMT', 'DV', 'MDV', 'STUDY DAY', 'DRUG/ARM', 'AGE', 'SEX', 'ALBUMIN', 'WEIGHT']
+
+# print(drug_conc[:40])
+
+# # TODO: 
+# # 1) Change date to start time
+
+
+
+os.remove('data/nonmem.csv')
+df.to_csv('data/nonmem.csv', index = False)
+
+
+
+# ## graph requirements: 
+# # Color by covariates 
+# # Need 1 average line and lines for each person 
+
+# # 2. Line plot of renal clearance by age 
+# # Need average and std dev 
+
+# # 3. Boxplot of female and male by weight 
 
 
 
