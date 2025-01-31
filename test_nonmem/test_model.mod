@@ -1,0 +1,54 @@
+;; 1. Based on: 106
+;; 2. Description: PK model
+;; x1. Author: user
+
+$PROBLEM    PK model
+
+$INPUT      ID DATE=DROP TIME AMT II ADDL DV MDV
+
+$DATA      test_data.csv IGNORE=@ 
+
+$SUBROUTINE ADVAN2 TRANS2
+$PK
+
+
+TVCL  = THETA(1)* EXP(ETA(1))
+CL    = TVCL
+TVV   = THETA(2)*EXP(ETA(2))
+V    = TVV
+TVKA   = THETA(3)* EXP(ETA(3))
+KA  = TVKA
+
+F1 = 1
+
+S2=V
+
+$ERROR
+IPRED = F
+PROP=THETA(4)
+ADD=THETA(5)
+W   = SQRT(PROP**2*IPRED**2 + ADD**2)
+IRES = DV-IPRED
+
+IWRES = IRES/W
+Y=F+W*EPS(1)
+
+$THETA
+(0, 3.78)	         ; CLTV 
+(0,31.4)	         ; VTV
+(0,1.01)              ; KATV
+(0,0.0951) ; prop error
+0 FIXED ; additive error
+
+$OMEGA
+0.0719 	            ; IIV CL
+0.0404	            ; IIV V
+0.126 	            ; IIV KA
+
+$SIGMA
+1 FIXED                   ;PRO
+$ESTIMATION METHOD=1 INTERACTION MAXEVAL=99999 POSTHOC NOABORT PRINT=5
+$COV UNCONDITIONAL MATRIX=S PRINT=E
+$TABLE ID TIME AMT MDV KA CL V CWRES NPDE IPRED NOPRINT ONEHEADER FILE=sdtab107
+;$TABLE ID  ONEHEADER NOPRINT FILE=cotab107
+;$TABLE ID  ONEHEADER NOPRINT FILE=catab107

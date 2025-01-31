@@ -1,0 +1,98 @@
+if(Sys.getenv("R_LIB") != "") { .libPaths(c(Sys.getenv("R_LIB"), .libPaths())) }
+
+### R script supplied with Pirana
+### by Ron Keizer, 2010
+###
+### Required: - NM table file with WRES and PRED on first $TABLE record
+###
+### Description: This R-script create a plot of WRES versus PRED, for
+### multiple selected models
+###
+
+if(Sys.getenv("R_LIB") != "") { .libPaths(c(Sys.getenv("R_LIB"), .libPaths())) }
+library(lattice)
+
+req.fields <- c("CWRES", "PRED")
+models <- list ( 
+  "test_model" = list ( 
+    modelfile       = "test_model.mod",
+    description     = "PK model",
+    reference_model = "106",
+    working_dir     = "/Users/jeff/Desktop/nonmem_project/test_nonmem",
+    data_file       = "test_data.csv",
+    output_file     = "test_model.lst",
+    tables          = c("sdtab107"),
+    estim           = list(
+      th          = c(9.58E+00, 7.69E+01, 1.01E+00, 8.76E-02, 0.00E+00),
+      th_se       = c(1.98E+00, 7.21E+00, 1.52E-01, 1.19E-02, NA),
+      om          = c(0.115, 0.0595, 0.166),
+      om_se       = c(0.0808,0.0376,0.0909),
+      om_block    = matrix(c( 0.115, 0, 0,
+                              0, 0.0595, 0,
+                              0, 0, 0.166), ncol=3),
+      om_se       = c(0.0808,0.0376,0.0909),
+      si          = c( 1),
+      si_se       = c(0),
+      si_block    = matrix(c(1), ncol=1),
+      si_se_block = matrix(c(0), ncol=1)
+    )
+  )
+)
+run_from <- list(software = "pirana", version = "2.9.9")
+open_res <- 1
+
+setwd('/Users/jeff/Desktop/nonmem_project/test_nonmem')
+model_names <- names(models)
+if (!file.exists("pirana_reports")) {dir.create ("pirana_reports")}
+for (i in 1:length(model_names)) {
+    fname <- paste("pirana_reports/",names(models)[i],"_CWRES_vs_PRED.pdf", sep="")
+    if (file.exists (fname)){
+        file.remove (fname)
+    }
+    mod      <- models[[model_names[i]]]
+    tab_file <- c(mod$tables[grep("sdtab", mod$tables)])[1]
+    if (is.na(tab_file)) { # then assume the first table has the gof variables
+        tab_file <- mod$tables[1]
+    }
+    if (file.exists (tab_file)) {
+        tab      <- read.table (tab_file, skip=1, header=T) # NONMEM table with ONEHEADER option
+        m <- match (names(models[[model_names[i]]]$input_trans), colnames(tab))        # tranlation of $INPUT variables
+        colnames(tab)[m] <- unlist (models[[model_names[i]]]$input_trans, use.names=F) # tranlation of $INPUT variables
+        if ("MDV" %in% names(tab)) { tab <- tab[tab$MDV==0,] }
+        if ("EVID" %in% names(tab)) { tab <- tab[tab$EVID==0,] }
+        not.found <- req.fields[is.na(match(req.fields, colnames(tab)))]
+        if ( length (not.found) > 0) {
+          cat (paste("The variable(s)",not.found,"were not found. Please check your output tables.\nStopping R execution."))
+          quit()
+        }
+
+########################################################################################################
+# R code for plotting starts here
+        pl <- xyplot (CWRES~PRED, data=tab,
+                       main = paste (model_names[i],": ", mod$description, sep=""),
+                       panel = function(x, y, ...) {
+                           panel.xyplot(x, y, ...)
+                           panel.abline(a=0, b=0, col="#888888", lwd=2, lty=3)
+                           panel.loess(x, y, lwd=3, lty=2, col.line="red", ...)
+                       },
+                      pch=19, xlab="Population predictions", ylab="Conditional Weighted residuals")
+########################################################################################################
+    } else {
+        cat (paste("The table file ",tab_file," was not found. Please check your output tables.\nStopping R execution."))
+        quit()
+    }
+    pdf (file = fname)
+    print (pl)
+    dev.off()
+
+    # open created file
+    cat (paste("OUTPUT: ", fname, sep=""))
+    if (file.exists(fname) && open_res) {
+        if (Sys.info()['sysname'] == 'Windows') { shell.exec(paste(getwd(),"/",fname,sep="")) }  # windows
+	else if (Sys.info()['sysname'] == 'Darwin') { system(paste ("open ",fname, sep="")) } # mac
+	else { system(paste("xdg-open ", fname, sep=""), ignore.stdout=TRUE, ignore.stderr=TRUE, wait=FALSE) } # linux
+    }
+
+}
+
+quit()

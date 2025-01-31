@@ -1,0 +1,2 @@
+/usr/local/bin/vpc -samples=200 -auto_bin=auto -dir=vpc_test_model test_model.mod
+/usr/local/bin/vpc -samples=200 -auto_bin=auto -dir=vpc_test_model test_model.mod
